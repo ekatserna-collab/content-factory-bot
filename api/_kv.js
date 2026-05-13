@@ -1,6 +1,8 @@
 import { Redis } from "@upstash/redis";
 
-export const kv = Redis.fromEnv();
+const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+export const kv = new Redis({ url, token });
 
 export const KEY_OWNER_CHAT = "owner:chat_id";
 export const KEY_DRAFT_COUNTER = "draft:counter";
