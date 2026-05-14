@@ -193,9 +193,10 @@ export async function fireRoutine(kind) {
       headers: {
         "Authorization": `Bearer ${cfg.token}`,
         "anthropic-beta": "experimental-cc-routine-2026-04-01",
-        "Content-Type": "text/plain"
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json"
       },
-      body: `manual trigger from Telegram bot at ${new Date().toISOString()}`
+      body: JSON.stringify({})
     });
     const text = await res.text();
     let parsed;
