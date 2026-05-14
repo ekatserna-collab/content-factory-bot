@@ -84,34 +84,75 @@ async function handleMessage(message) {
     });
   }
 
-  if (text === "/pillar" || text === "/cycle") {
-    const r = await fireRoutine("pillar_cycle");
-    return replyFireResult(chatId, "Pillar-Cycle", r);
+  // Pipeline stages — sequential
+  if (text === "/research") {
+    return replyFireResult(chatId, "Daily Researcher", await fireRoutine("research"));
   }
-
   if (text === "/bigidea" || text === "/curator") {
-    const r = await fireRoutine("curator");
-    return replyFireResult(chatId, "Куратор + Продюсер", r);
+    return replyFireResult(chatId, "Big Idea (Curator+Producer)", await fireRoutine("bigidea"));
   }
-
-  if (text === "/test" || text === "/threads") {
-    const r = await fireRoutine("tester");
-    return replyFireResult(chatId, "Hypothesis Tester", r);
+  if (text === "/test" || text === "/tester") {
+    return replyFireResult(chatId, "Hypothesis Tester", await fireRoutine("tester"));
   }
-
+  if (text === "/pillar" || text === "/cycle") {
+    return replyFireResult(chatId, "Pillar Writer", await fireRoutine("pillar"));
+  }
+  if (text === "/pillaredit") {
+    return replyFireResult(chatId, "Pillar Editor", await fireRoutine("pillar_editor"));
+  }
+  if (text === "/atomize" || text === "/atomizer") {
+    return replyFireResult(chatId, "Atomizer", await fireRoutine("atomizer"));
+  }
+  // 4 parallel format writers
+  if (text === "/carousel") {
+    return replyFireResult(chatId, "Carousel Writer", await fireRoutine("carousel"));
+  }
+  if (text === "/reels") {
+    return replyFireResult(chatId, "Reels Writer", await fireRoutine("reels_writer"));
+  }
+  if (text === "/threadsw" || text === "/threads_w") {
+    return replyFireResult(chatId, "Threads Writer", await fireRoutine("threads_writer"));
+  }
+  if (text === "/storiesw" || text === "/stories_w") {
+    return replyFireResult(chatId, "Stories Writer", await fireRoutine("stories_writer"));
+  }
+  // Format editor (merge)
+  if (text === "/editfmt" || text === "/fmteditor") {
+    return replyFireResult(chatId, "Format Editor", await fireRoutine("format_editor"));
+  }
+  // Async stages
   if (text === "/studio") {
-    const r = await fireRoutine("studio");
-    return replyFireResult(chatId, "Studio Day Orchestrator", r);
+    return replyFireResult(chatId, "Studio Day Orchestrator", await fireRoutine("studio"));
+  }
+  if (text === "/analyst" || text === "/analytics") {
+    return replyFireResult(chatId, "Weekly Analyst", await fireRoutine("analyst"));
+  }
+  if (text === "/weekly" || text === "/strategy") {
+    return replyFireResult(chatId, "Strategist + Planner", await fireRoutine("weekly"));
   }
 
-  if (text === "/weekly") {
-    const r = await fireRoutine("weekly");
-    return replyFireResult(chatId, "Weekly Strategist", r);
-  }
-
-  if (text === "/draft" || text === "/produce") {
-    const r = await fireRoutine("daily");
-    return replyFireResult(chatId, "Daily Producer (legacy)", r);
+  // /pipeline — статус текущей недели
+  if (text === "/pipeline") {
+    return tg("sendMessage", {
+      chat_id: chatId,
+      text:
+        `📋 <b>Pipeline недели</b>\n\n` +
+        `Текущий статус смотри в репо <code>memory/pipeline-status.md</code> на GitHub.\n\n` +
+        `Стадии (sequential):\n` +
+        `1. 🔍 Daily Researcher (cron 08:00 ежедн)\n` +
+        `2. 🎯 Big Idea — /bigidea (cron пн 09:00)\n` +
+        `3. 🧪 Test Threads — /test (опц)\n` +
+        `4. 📝 Pillar Writer — /pillar (cron вт 09:00)\n` +
+        `5. ✏️ Pillar Editor — /pillaredit (cron вт 11:00)\n` +
+        `6. 🪓 Atomizer — /atomize (cron ср 09:00)\n` +
+        `7. 🖼🎬🧵📸 4 параллельных format-writer (cron ср 11:00)\n` +
+        `8. ✏️ Format Editor — /editfmt (cron ср 17:00)\n\n` +
+        `Async:\n` +
+        `• 📸 Studio Day — /studio (cron чт 17:00)\n` +
+        `• 📊 Weekly Analyst — /analyst (cron вс 17:00)\n` +
+        `• 🎯 Strategy + Plan — /weekly (cron вс 18:00)`,
+      parse_mode: "HTML"
+    });
   }
 
   if (text === "/funnel" || text.startsWith("/funnel ")) {
@@ -295,12 +336,20 @@ async function handleCallback(cb) {
   if (action === "fire") {
     const kind = rest[0];
     const labels = {
-      pillar_cycle: "Pillar-Cycle",
-      curator: "Куратор + Продюсер",
+      research: "Daily Researcher",
+      bigidea: "Big Idea (Curator+Producer)",
       tester: "Hypothesis Tester",
-      studio: "Studio Day",
-      weekly: "Weekly Strategist",
-      daily: "Daily Producer"
+      pillar: "Pillar Writer",
+      pillar_editor: "Pillar Editor",
+      atomizer: "Atomizer",
+      carousel: "Carousel Writer",
+      reels_writer: "Reels Writer",
+      threads_writer: "Threads Writer",
+      stories_writer: "Stories Writer",
+      format_editor: "Format Editor",
+      studio: "Studio Day Orchestrator",
+      analyst: "Weekly Analyst",
+      weekly: "Strategist + Planner"
     };
     const label = labels[kind] || kind;
     await ack(`Запускаю ${label}…`);
@@ -315,6 +364,7 @@ async function handleCallback(cb) {
     if (view === "status") return handleMessage({ chat: { id: chatId }, text: "/status", from: { first_name: "" } });
     if (view === "help") return handleMessage({ chat: { id: chatId }, text: "/help", from: { first_name: "" } });
     if (view === "funnel") return handleMessage({ chat: { id: chatId }, text: "/funnel", from: { first_name: "" } });
+    if (view === "pipeline") return handleMessage({ chat: { id: chatId }, text: "/pipeline", from: { first_name: "" } });
     return;
   }
 

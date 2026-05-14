@@ -89,22 +89,41 @@ export function mainMenuKeyboard() {
   return {
     inline_keyboard: [
       [
-        { text: "📦 Запустить недельный pillar-cycle", callback_data: "fire:pillar_cycle" }
+        { text: "📋 Pipeline-статус недели", callback_data: "ui:pipeline" }
       ],
       [
-        { text: "🎯 Big Idea недели", callback_data: "fire:curator" },
-        { text: "🧪 Тестовые Threads", callback_data: "fire:tester" }
+        { text: "🎯 Big Idea", callback_data: "fire:bigidea" },
+        { text: "🧪 Test Threads", callback_data: "fire:tester" }
       ],
       [
-        { text: "📸 Studio Day пакет", callback_data: "fire:studio" },
-        { text: "📅 Weekly стратегия", callback_data: "fire:weekly" }
+        { text: "📝 Pillar Writer", callback_data: "fire:pillar" },
+        { text: "🪓 Atomizer", callback_data: "fire:atomizer" }
+      ],
+      [
+        { text: "🖼 Carousel", callback_data: "fire:carousel" },
+        { text: "🎬 Reels", callback_data: "fire:reels_writer" }
+      ],
+      [
+        { text: "🧵 Threads writer", callback_data: "fire:threads_writer" },
+        { text: "📸 Stories writer", callback_data: "fire:stories_writer" }
+      ],
+      [
+        { text: "✏️ Format Editor (4 formats)", callback_data: "fire:format_editor" }
+      ],
+      [
+        { text: "📸 Studio Day", callback_data: "fire:studio" },
+        { text: "🔍 Daily Research", callback_data: "fire:research" }
+      ],
+      [
+        { text: "📊 Weekly Analyst", callback_data: "fire:analyst" },
+        { text: "🎯 Strategy + Plan", callback_data: "fire:weekly" }
       ],
       [
         { text: "📋 Очередь", callback_data: "ui:queue" },
         { text: "📊 Статус", callback_data: "ui:status" }
       ],
       [
-        { text: "🎬 Воронка (запуск)", callback_data: "ui:funnel" },
+        { text: "🎬 Воронка", callback_data: "ui:funnel" },
         { text: "ℹ️ Справка", callback_data: "ui:help" }
       ]
     ]
@@ -113,50 +132,52 @@ export function mainMenuKeyboard() {
 
 const MENU_TEXT =
   "🤖 <b>Контент-завод</b> для @aiplaceeee\n\n" +
-  "<b>Главное:</b>\n" +
-  "📦 <b>Pillar-cycle</b> — полный цикл недели: Big Idea → длинный пост + карусель + Reels + Threads + Stories. 1 раз в неделю.\n\n" +
-  "<b>По частям:</b>\n" +
-  "🎯 <b>Big Idea</b> — Куратор соберёт 5-7 идей, Продюсер выберет одну\n" +
-  "🧪 <b>Тестовые Threads</b> — 3 версии хука для теста до полного цикла\n" +
-  "📸 <b>Studio Day</b> — пакет из 4-6 Reels-сценариев на 2 часа съёмки\n" +
-  "📅 <b>Weekly стратегия</b> — пересмотр фокуса и плана (вс вечером)\n\n" +
-  "<b>Запуски (когда стадия канала ≥ 1):</b>\n" +
-  "🎬 <b>Воронка</b> — построить продающую серию (PLF + Тимочко)";
+  "Pipeline pattern — каждая стадия отдельная routine. Можно запустить по очереди (рекомендуется) или вручную.\n\n" +
+  "<b>📋 Pipeline недельный (понедельник → среда):</b>\n" +
+  "1. 🎯 Big Idea — Куратор + Продюсер\n" +
+  "2. 🧪 Test Threads — 3 версии хука (опц)\n" +
+  "3. 📝 Pillar Writer — длинный pillar\n" +
+  "4. 🪓 Atomizer — бриф для 4 форматов\n" +
+  "5. 🖼🎬🧵📸 4 параллельных format-writer\n" +
+  "6. ✏️ Format Editor — batch review + submit\n\n" +
+  "<b>📸 Дополнительные стадии:</b>\n" +
+  "• Studio Day (чт) — пакет Reels на пятницу\n" +
+  "• Daily Research (ежедн) — накопление сигналов\n\n" +
+  "<b>📊 Weekly (воскресенье):</b>\n" +
+  "• Analyst → Strategy + Plan\n\n" +
+  "<b>🎬 Воронки (стадия канала ≥ 1):</b>\n" +
+  "PLF-структура + Тимочко";
 
 export { MENU_TEXT };
 
 export async function fireRoutine(kind) {
   const map = {
-    pillar_cycle: {
-      url: process.env.ROUTINE_PILLAR_CYCLE_URL,
-      token: process.env.ROUTINE_PILLAR_CYCLE_TOKEN,
-      label: "Pillar-Cycle (полный недельный цикл)"
-    },
-    curator: {
-      url: process.env.ROUTINE_CURATOR_URL,
-      token: process.env.ROUTINE_CURATOR_TOKEN,
-      label: "Куратор + Продюсер (Big Idea)"
-    },
-    tester: {
-      url: process.env.ROUTINE_TESTER_URL,
-      token: process.env.ROUTINE_TESTER_TOKEN,
-      label: "Hypothesis Tester (3 Threads)"
-    },
-    studio: {
-      url: process.env.ROUTINE_STUDIO_URL,
-      token: process.env.ROUTINE_STUDIO_TOKEN,
-      label: "Studio Day Orchestrator"
-    },
-    weekly: {
-      url: process.env.ROUTINE_WEEKLY_URL,
-      token: process.env.ROUTINE_WEEKLY_TOKEN,
-      label: "Weekly Strategist"
-    },
-    daily: {
-      url: process.env.ROUTINE_DAILY_URL,
-      token: process.env.ROUTINE_DAILY_TOKEN,
-      label: "Daily Producer (legacy)"
-    }
+    // Pipeline stages (sequential — основной поток)
+    research: { url: process.env.ROUTINE_RESEARCH_URL, token: process.env.ROUTINE_RESEARCH_TOKEN, label: "🔍 Daily Researcher" },
+    bigidea: { url: process.env.ROUTINE_BIGIDEA_URL, token: process.env.ROUTINE_BIGIDEA_TOKEN, label: "🎯 Big Idea (Curator+Producer)" },
+    tester: { url: process.env.ROUTINE_TESTER_URL, token: process.env.ROUTINE_TESTER_TOKEN, label: "🧪 Hypothesis Tester" },
+    pillar: { url: process.env.ROUTINE_PILLAR_URL, token: process.env.ROUTINE_PILLAR_TOKEN, label: "📝 Pillar Writer" },
+    pillar_editor: { url: process.env.ROUTINE_PILLAR_EDITOR_URL, token: process.env.ROUTINE_PILLAR_EDITOR_TOKEN, label: "✏️ Pillar Editor" },
+    atomizer: { url: process.env.ROUTINE_ATOMIZER_URL, token: process.env.ROUTINE_ATOMIZER_TOKEN, label: "🪓 Atomizer" },
+
+    // 4 parallel format writers
+    carousel: { url: process.env.ROUTINE_CAROUSEL_URL, token: process.env.ROUTINE_CAROUSEL_TOKEN, label: "🖼 Carousel Writer" },
+    reels_writer: { url: process.env.ROUTINE_REELS_WRITER_URL, token: process.env.ROUTINE_REELS_WRITER_TOKEN, label: "🎬 Reels Writer" },
+    threads_writer: { url: process.env.ROUTINE_THREADS_WRITER_URL, token: process.env.ROUTINE_THREADS_WRITER_TOKEN, label: "🧵 Threads Writer" },
+    stories_writer: { url: process.env.ROUTINE_STORIES_WRITER_URL, token: process.env.ROUTINE_STORIES_WRITER_TOKEN, label: "📸 Stories Writer" },
+
+    // Merge stage
+    format_editor: { url: process.env.ROUTINE_FORMAT_EDITOR_URL, token: process.env.ROUTINE_FORMAT_EDITOR_TOKEN, label: "✏️ Format Editor (batch)" },
+
+    // Async stages
+    studio: { url: process.env.ROUTINE_STUDIO_URL, token: process.env.ROUTINE_STUDIO_TOKEN, label: "📸 Studio Day Orchestrator" },
+    analyst: { url: process.env.ROUTINE_ANALYST_URL, token: process.env.ROUTINE_ANALYST_TOKEN, label: "📊 Weekly Analyst" },
+    weekly: { url: process.env.ROUTINE_WEEKLY_URL, token: process.env.ROUTINE_WEEKLY_TOKEN, label: "🎯 Strategist + Planner" },
+
+    // Legacy aliases для обратной совместимости (можно убрать после очистки env)
+    pillar_cycle: { url: process.env.ROUTINE_BIGIDEA_URL, token: process.env.ROUTINE_BIGIDEA_TOKEN, label: "(legacy) Запускаю Big Idea — далее по cron автоматически" },
+    curator: { url: process.env.ROUTINE_BIGIDEA_URL, token: process.env.ROUTINE_BIGIDEA_TOKEN, label: "(alias) Big Idea" },
+    daily: { url: process.env.ROUTINE_BIGIDEA_URL, token: process.env.ROUTINE_BIGIDEA_TOKEN, label: "(legacy) Big Idea" }
   };
   const cfg = map[kind];
   if (!cfg || !cfg.url || !cfg.token) {

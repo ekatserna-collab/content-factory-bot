@@ -16,16 +16,25 @@ export default async function handler(req, res) {
 
     const commands = [
       { command: "menu", description: "Главное меню" },
-      { command: "pillar", description: "Запустить недельный pillar-cycle" },
-      { command: "bigidea", description: "Big Idea недели (Куратор + Продюсер)" },
-      { command: "test", description: "Тестовые Threads (3 версии хука)" },
-      { command: "studio", description: "Пакет Reels на студио-день" },
-      { command: "weekly", description: "Пересмотр стратегии (вс вечером)" },
-      { command: "funnel", description: "Запуск воронки продаж (стадия 1+)" },
+      { command: "pipeline", description: "Статус pipeline недели" },
+      { command: "bigidea", description: "1. Big Idea (Curator + Producer)" },
+      { command: "test", description: "2. Тестовые Threads (опц)" },
+      { command: "pillar", description: "3. Pillar Writer (длинный пост)" },
+      { command: "atomize", description: "4. Atomizer (бриф 4 форматов)" },
+      { command: "carousel", description: "5a. Carousel Writer" },
+      { command: "reels", description: "5b. Reels Writer" },
+      { command: "threadsw", description: "5c. Threads Writer" },
+      { command: "storiesw", description: "5d. Stories Writer" },
+      { command: "editfmt", description: "6. Format Editor (4 формата)" },
+      { command: "studio", description: "Studio Day (пакет Reels на пт)" },
+      { command: "research", description: "Daily Research (накопление сигналов)" },
+      { command: "analyst", description: "Weekly Analyst (метрики)" },
+      { command: "weekly", description: "Strategist + Planner (вс)" },
+      { command: "funnel", description: "Воронка продаж (стадия 1+)" },
       { command: "queue", description: "Очередь публикаций" },
       { command: "status", description: "Статус бота" },
       { command: "claim", description: "Регистрация владельца (1 раз)" },
-      { command: "id", description: "Показать свой chat_id" },
+      { command: "id", description: "chat_id" },
       { command: "help", description: "Справка" }
     ];
     const cmdRes = await fetch(`https://api.telegram.org/bot${TOKEN}/setMyCommands`, {
