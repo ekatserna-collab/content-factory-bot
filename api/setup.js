@@ -16,8 +16,12 @@ export default async function handler(req, res) {
 
     const commands = [
       { command: "menu", description: "Главное меню" },
-      { command: "draft", description: "Сгенерировать пост сейчас" },
-      { command: "weekly", description: "Пересмотр стратегии и плана" },
+      { command: "pillar", description: "Запустить недельный pillar-cycle" },
+      { command: "bigidea", description: "Big Idea недели (Куратор + Продюсер)" },
+      { command: "test", description: "Тестовые Threads (3 версии хука)" },
+      { command: "studio", description: "Пакет Reels на студио-день" },
+      { command: "weekly", description: "Пересмотр стратегии (вс вечером)" },
+      { command: "funnel", description: "Запуск воронки продаж (стадия 1+)" },
       { command: "queue", description: "Очередь публикаций" },
       { command: "status", description: "Статус бота" },
       { command: "claim", description: "Регистрация владельца (1 раз)" },

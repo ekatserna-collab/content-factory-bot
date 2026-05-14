@@ -89,14 +89,22 @@ export function mainMenuKeyboard() {
   return {
     inline_keyboard: [
       [
-        { text: "✨ Сгенерировать пост", callback_data: "fire:daily" }
+        { text: "📦 Запустить недельный pillar-cycle", callback_data: "fire:pillar_cycle" }
       ],
       [
-        { text: "📅 Weekly: стратегия + план", callback_data: "fire:weekly" },
-        { text: "📋 Очередь", callback_data: "ui:queue" }
+        { text: "🎯 Big Idea недели", callback_data: "fire:curator" },
+        { text: "🧪 Тестовые Threads", callback_data: "fire:tester" }
       ],
       [
-        { text: "📊 Статус", callback_data: "ui:status" },
+        { text: "📸 Studio Day пакет", callback_data: "fire:studio" },
+        { text: "📅 Weekly стратегия", callback_data: "fire:weekly" }
+      ],
+      [
+        { text: "📋 Очередь", callback_data: "ui:queue" },
+        { text: "📊 Статус", callback_data: "ui:status" }
+      ],
+      [
+        { text: "🎬 Воронка (запуск)", callback_data: "ui:funnel" },
         { text: "ℹ️ Справка", callback_data: "ui:help" }
       ]
     ]
@@ -105,29 +113,57 @@ export function mainMenuKeyboard() {
 
 const MENU_TEXT =
   "🤖 <b>Контент-завод</b> для @aiplaceeee\n\n" +
-  "Выбери действие. Если нужно прямо сейчас — жми «Сгенерировать пост», агент проснётся, " +
-  "соберёт тему, напишет, оформит и пришлёт черновик сюда с кнопками одобрения.";
+  "<b>Главное:</b>\n" +
+  "📦 <b>Pillar-cycle</b> — полный цикл недели: Big Idea → длинный пост + карусель + Reels + Threads + Stories. 1 раз в неделю.\n\n" +
+  "<b>По частям:</b>\n" +
+  "🎯 <b>Big Idea</b> — Куратор соберёт 5-7 идей, Продюсер выберет одну\n" +
+  "🧪 <b>Тестовые Threads</b> — 3 версии хука для теста до полного цикла\n" +
+  "📸 <b>Studio Day</b> — пакет из 4-6 Reels-сценариев на 2 часа съёмки\n" +
+  "📅 <b>Weekly стратегия</b> — пересмотр фокуса и плана (вс вечером)\n\n" +
+  "<b>Запуски (когда стадия канала ≥ 1):</b>\n" +
+  "🎬 <b>Воронка</b> — построить продающую серию (PLF + Тимочко)";
 
 export { MENU_TEXT };
 
 export async function fireRoutine(kind) {
   const map = {
-    daily: {
-      url: process.env.ROUTINE_DAILY_URL,
-      token: process.env.ROUTINE_DAILY_TOKEN,
-      label: "Daily Producer"
+    pillar_cycle: {
+      url: process.env.ROUTINE_PILLAR_CYCLE_URL,
+      token: process.env.ROUTINE_PILLAR_CYCLE_TOKEN,
+      label: "Pillar-Cycle (полный недельный цикл)"
+    },
+    curator: {
+      url: process.env.ROUTINE_CURATOR_URL,
+      token: process.env.ROUTINE_CURATOR_TOKEN,
+      label: "Куратор + Продюсер (Big Idea)"
+    },
+    tester: {
+      url: process.env.ROUTINE_TESTER_URL,
+      token: process.env.ROUTINE_TESTER_TOKEN,
+      label: "Hypothesis Tester (3 Threads)"
+    },
+    studio: {
+      url: process.env.ROUTINE_STUDIO_URL,
+      token: process.env.ROUTINE_STUDIO_TOKEN,
+      label: "Studio Day Orchestrator"
     },
     weekly: {
       url: process.env.ROUTINE_WEEKLY_URL,
       token: process.env.ROUTINE_WEEKLY_TOKEN,
       label: "Weekly Strategist"
+    },
+    daily: {
+      url: process.env.ROUTINE_DAILY_URL,
+      token: process.env.ROUTINE_DAILY_TOKEN,
+      label: "Daily Producer (legacy)"
     }
   };
   const cfg = map[kind];
   if (!cfg || !cfg.url || !cfg.token) {
+    const envBase = kind.toUpperCase();
     return {
       ok: false,
-      error: `Routine ${kind} ещё не настроена. Создай Routine на code.claude.com и пропиши ROUTINE_${kind.toUpperCase()}_URL и ROUTINE_${kind.toUpperCase()}_TOKEN в env var Vercel.`
+      error: `Routine "${kind}" ещё не настроена.\n\nЧто сделать:\n1. Создай Routine "${cfg?.label || kind}" на code.claude.com (repo: ekatserna-collab/content-factory-agents)\n2. Скопируй её Trigger URL и Token\n3. Добавь в Vercel env vars:\n   ROUTINE_${envBase}_URL = ...\n   ROUTINE_${envBase}_TOKEN = ...`
     };
   }
   try {

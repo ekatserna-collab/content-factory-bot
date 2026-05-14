@@ -84,14 +84,52 @@ async function handleMessage(message) {
     });
   }
 
-  if (text === "/draft" || text === "/produce") {
-    const r = await fireRoutine("daily");
-    return replyFireResult(chatId, "Daily Producer", r);
+  if (text === "/pillar" || text === "/cycle") {
+    const r = await fireRoutine("pillar_cycle");
+    return replyFireResult(chatId, "Pillar-Cycle", r);
+  }
+
+  if (text === "/bigidea" || text === "/curator") {
+    const r = await fireRoutine("curator");
+    return replyFireResult(chatId, "Куратор + Продюсер", r);
+  }
+
+  if (text === "/test" || text === "/threads") {
+    const r = await fireRoutine("tester");
+    return replyFireResult(chatId, "Hypothesis Tester", r);
+  }
+
+  if (text === "/studio") {
+    const r = await fireRoutine("studio");
+    return replyFireResult(chatId, "Studio Day Orchestrator", r);
   }
 
   if (text === "/weekly") {
     const r = await fireRoutine("weekly");
     return replyFireResult(chatId, "Weekly Strategist", r);
+  }
+
+  if (text === "/draft" || text === "/produce") {
+    const r = await fireRoutine("daily");
+    return replyFireResult(chatId, "Daily Producer (legacy)", r);
+  }
+
+  if (text === "/funnel" || text.startsWith("/funnel ")) {
+    return tg("sendMessage", {
+      chat_id: chatId,
+      text:
+        `🎬 <b>Воронка продаж — Funnel Producer</b>\n\n` +
+        `Запуск воронки активируется только когда канал на <b>стадии 1+</b> (накоплено 15+ содержательных постов).\n\n` +
+        `Для запуска нужно:\n` +
+        `1. Указать продукт (консультация / разработка / курс)\n` +
+        `2. Дата open cart\n` +
+        `3. Длительность open cart (4-7 дней)\n` +
+        `4. Цена + value stack\n` +
+        `5. Есть ли lead magnet\n\n` +
+        `Пока канал на стадии 0 — рано. Сначала набираем контекст.\n` +
+        `Прочитай <code>knowledge/methodologies/funnel-launches.md</code> в репо для деталей.`,
+      parse_mode: "HTML"
+    });
   }
 
   if (text === "/claim") {
@@ -166,22 +204,32 @@ async function handleMessage(message) {
       chat_id: chatId,
       text:
         `<b>Как пользоваться</b>\n\n` +
-        `<b>Получение черновиков:</b>\n` +
-        `1) Жми кнопку «✨ Сгенерировать пост» в /menu — агент проснётся, через 2–5 мин пришлёт готовый черновик.\n` +
-        `2) Либо ждёшь авто-запуска по расписанию (3 раза в день, без твоего участия).\n\n` +
+        `<b>📦 Главный режим — недельный pillar-cycle:</b>\n` +
+        `Один раз в неделю запускаешь Pillar-cycle → агенты делают:\n` +
+        `• 📝 Длинный pillar для Telegram\n` +
+        `• 🖼 Carousel 8-12 слайдов\n` +
+        `• 🎬 Reels-сценарий (3 версии хука)\n` +
+        `• 🧵 3-5 Threads постов\n` +
+        `• 📸 Stories серия\n\n` +
+        `Каждый формат прилетает отдельной карточкой с кнопками одобрения.\n\n` +
+        `<b>🧪 По частям (если нужен контроль):</b>\n` +
+        `• /bigidea — только Куратор соберёт идеи\n` +
+        `• /test — 3 Threads для теста угла\n` +
+        `• /studio — пакет Reels на студио-день\n` +
+        `• /weekly — пересмотр стратегии (вс)\n\n` +
+        `<b>📋 Управление:</b>\n` +
+        `• /menu — главное меню\n` +
+        `• /queue — очередь публикаций\n` +
+        `• /status — статус бота\n` +
+        `• /claim — регистрация владельца (один раз)\n\n` +
+        `<b>🎬 Запуски (будущее, стадия 1+):</b>\n` +
+        `• /funnel — запуск воронки продаж (PLF + Тимочко)\n\n` +
         `<b>На каждом черновике 5 кнопок:</b>\n` +
-        `   • ✅ В канал сейчас — публикация немедленно\n` +
-        `   • ⏰ Завтра 09:00 — в очередь\n` +
-        `   • 🌆 Сегодня 19:00 — в очередь\n` +
-        `   • ✏️ Доработать — следующим сообщением напиши правки, агент учтёт\n` +
-        `   • ❌ Отклонить — отметится как отказанный\n\n` +
-        `<b>Команды:</b>\n` +
-        `/menu — главное меню с кнопками\n` +
-        `/draft — запустить генерацию поста (то же что кнопка)\n` +
-        `/weekly — запустить пересмотр стратегии + плана\n` +
-        `/queue — очередь публикаций\n` +
-        `/status — статус бота\n` +
-        `/claim — регистрация владельца (один раз)`,
+        `   • ✅ В канал сейчас\n` +
+        `   • ⏰ Завтра 09:00\n` +
+        `   • 🌆 Сегодня 19:00\n` +
+        `   • ✏️ Доработать — следующим сообщением правки\n` +
+        `   • ❌ Отклонить`,
       parse_mode: "HTML"
     });
   }
@@ -246,7 +294,15 @@ async function handleCallback(cb) {
 
   if (action === "fire") {
     const kind = rest[0];
-    const label = kind === "daily" ? "Daily Producer" : "Weekly Strategist";
+    const labels = {
+      pillar_cycle: "Pillar-Cycle",
+      curator: "Куратор + Продюсер",
+      tester: "Hypothesis Tester",
+      studio: "Studio Day",
+      weekly: "Weekly Strategist",
+      daily: "Daily Producer"
+    };
+    const label = labels[kind] || kind;
     await ack(`Запускаю ${label}…`);
     const r = await fireRoutine(kind);
     return replyFireResult(chatId, label, r);
@@ -258,6 +314,7 @@ async function handleCallback(cb) {
     if (view === "queue") return handleMessage({ chat: { id: chatId }, text: "/queue", from: { first_name: "" } });
     if (view === "status") return handleMessage({ chat: { id: chatId }, text: "/status", from: { first_name: "" } });
     if (view === "help") return handleMessage({ chat: { id: chatId }, text: "/help", from: { first_name: "" } });
+    if (view === "funnel") return handleMessage({ chat: { id: chatId }, text: "/funnel", from: { first_name: "" } });
     return;
   }
 
