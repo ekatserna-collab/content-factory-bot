@@ -127,6 +127,14 @@ export default async function handler(req, res) {
       if (mergeStatus.ok) merged.push(branch);
     }
 
+    // Dedupe: don't notify twice (feature-branch push + main push after auto-merge).
+    // Track commit hash in Redis with 30-min TTL.
+    const sha = c.id || c.sha || msg;
+    const dedupeKey = `webhook:notified:${sha}`;
+    const already = await kv.get(dedupeKey);
+    if (already) continue;
+    await kv.set(dedupeKey, "1", { ex: 60 * 30 });
+
     const text =
       `${stage.emoji} <b>${stage.title}</b>: ${stage.desc}\n\n` +
       `<i>${msg}</i>\n\n` +
