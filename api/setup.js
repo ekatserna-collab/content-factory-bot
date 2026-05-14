@@ -14,6 +14,23 @@ export default async function handler(req, res) {
     });
     const data = await tgRes.json();
 
+    const commands = [
+      { command: "menu", description: "Главное меню" },
+      { command: "draft", description: "Сгенерировать пост сейчас" },
+      { command: "weekly", description: "Пересмотр стратегии и плана" },
+      { command: "queue", description: "Очередь публикаций" },
+      { command: "status", description: "Статус бота" },
+      { command: "claim", description: "Регистрация владельца (1 раз)" },
+      { command: "id", description: "Показать свой chat_id" },
+      { command: "help", description: "Справка" }
+    ];
+    const cmdRes = await fetch(`https://api.telegram.org/bot${TOKEN}/setMyCommands`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commands })
+    });
+    const cmdData = await cmdRes.json();
+
     const meRes = await fetch(`https://api.telegram.org/bot${TOKEN}/getMe`);
     const meData = await meRes.json();
 
@@ -21,9 +38,10 @@ export default async function handler(req, res) {
       ok: true,
       webhook_url: webhookUrl,
       telegram_response: data,
+      commands_response: cmdData,
       bot_info: meData?.result,
       next_step: meData?.ok && data?.ok
-        ? `Открой Telegram, найди бота @${meData.result.username} и напиши ему /start`
+        ? `Открой Telegram, найди бота @${meData.result.username} и напиши /start`
         : "Что-то пошло не так. Проверь токен."
     });
   } catch (err) {

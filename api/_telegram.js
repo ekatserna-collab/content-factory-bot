@@ -84,3 +84,70 @@ export function formatScheduledMsg(slot, unixTs) {
   const mn = String(dt.getMinutes()).padStart(2, "0");
   return `${dd}.${mm} в ${hh}:${mn}`;
 }
+
+export function mainMenuKeyboard() {
+  return {
+    inline_keyboard: [
+      [
+        { text: "✨ Сгенерировать пост", callback_data: "fire:daily" }
+      ],
+      [
+        { text: "📅 Weekly: стратегия + план", callback_data: "fire:weekly" },
+        { text: "📋 Очередь", callback_data: "ui:queue" }
+      ],
+      [
+        { text: "📊 Статус", callback_data: "ui:status" },
+        { text: "ℹ️ Справка", callback_data: "ui:help" }
+      ]
+    ]
+  };
+}
+
+const MENU_TEXT =
+  "🤖 <b>Контент-завод</b> для @aiplaceeee\n\n" +
+  "Выбери действие. Если нужно прямо сейчас — жми «Сгенерировать пост», агент проснётся, " +
+  "соберёт тему, напишет, оформит и пришлёт черновик сюда с кнопками одобрения.";
+
+export { MENU_TEXT };
+
+export async function fireRoutine(kind) {
+  const map = {
+    daily: {
+      url: process.env.ROUTINE_DAILY_URL,
+      token: process.env.ROUTINE_DAILY_TOKEN,
+      label: "Daily Producer"
+    },
+    weekly: {
+      url: process.env.ROUTINE_WEEKLY_URL,
+      token: process.env.ROUTINE_WEEKLY_TOKEN,
+      label: "Weekly Strategist"
+    }
+  };
+  const cfg = map[kind];
+  if (!cfg || !cfg.url || !cfg.token) {
+    return {
+      ok: false,
+      error: `Routine ${kind} ещё не настроена. Создай Routine на code.claude.com и пропиши ROUTINE_${kind.toUpperCase()}_URL и ROUTINE_${kind.toUpperCase()}_TOKEN в env var Vercel.`
+    };
+  }
+  try {
+    const res = await fetch(cfg.url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${cfg.token}`,
+        "anthropic-beta": "experimental-cc-routine-2026-04-01",
+        "Content-Type": "text/plain"
+      },
+      body: `manual trigger from Telegram bot at ${new Date().toISOString()}`
+    });
+    const text = await res.text();
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { parsed = { raw: text.slice(0, 300) }; }
+    if (!res.ok) {
+      return { ok: false, status: res.status, body: parsed };
+    }
+    return { ok: true, label: cfg.label, session: parsed };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
