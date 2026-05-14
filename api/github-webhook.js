@@ -113,17 +113,28 @@ export default async function handler(req, res) {
   }
 
   const notified = [];
+  const merged = [];
   for (const c of commits) {
     const msg = (c.message || "").split("\n")[0].trim();
     const stage = classify(msg);
     if (!stage) continue;
 
+    // Auto-merge routine branches into main so the next pipeline stage
+    // (which reads from main) can find the result.
+    let mergeStatus = null;
+    if (branch.startsWith("claude/") && stage) {
+      mergeStatus = await mergeIntoMain(payload.repository?.full_name, branch);
+      if (mergeStatus.ok) merged.push(branch);
+    }
+
     const text =
       `${stage.emoji} <b>${stage.title}</b>: ${stage.desc}\n\n` +
       `<i>${msg}</i>\n\n` +
       (branch === "main"
-        ? `📦 в <code>main</code>`
-        : `🌿 в ветке <code>${branch}</code> — Pipeline ждёт merge в main`);
+        ? `📦 в <code>main</code> — следующая стадия может стартовать`
+        : mergeStatus?.ok
+          ? `🌿 <code>${branch}</code> → auto-merged в <code>main</code> ✅`
+          : `🌿 в ветке <code>${branch}</code> — merge не удался: ${mergeStatus?.error || "проверь"}`);
 
     await tg("sendMessage", {
       chat_id: ownerChatId,
@@ -134,5 +145,34 @@ export default async function handler(req, res) {
     notified.push(msg);
   }
 
-  return res.status(200).json({ ok: true, notified });
+  return res.status(200).json({ ok: true, notified, merged });
+}
+
+async function mergeIntoMain(repoFullName, headBranch) {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token || !repoFullName) {
+    return { ok: false, error: "GITHUB_TOKEN missing" };
+  }
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repoFullName}/merges`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        base: "main",
+        head: headBranch,
+        commit_message: `auto-merge: routine result from ${headBranch}`
+      })
+    });
+    if (res.status === 201 || res.status === 204) {
+      return { ok: true };
+    }
+    const body = await res.text();
+    return { ok: false, error: `HTTP ${res.status}: ${body.slice(0, 200)}` };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
 }
