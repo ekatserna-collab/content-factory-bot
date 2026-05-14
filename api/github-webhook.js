@@ -1,5 +1,5 @@
-import { kv, KEY_OWNER_CHAT } from "./_kv.js";
-import { tg } from "./_telegram.js";
+import { kv, KEY_OWNER_CHAT, nextDraftId, saveDraft } from "./_kv.js";
+import { tg, draftCardKeyboard, formatDraftCard } from "./_telegram.js";
 import crypto from "crypto";
 
 // POST /api/github-webhook
@@ -143,9 +143,115 @@ export default async function handler(req, res) {
       disable_web_page_preview: true
     });
     notified.push(msg);
+
+    // Auto-deliver draft cards for approved content (Pillar Editor or
+    // Format Editor) — even if the routine forgot to call submit-to-bot.sh.
+    const isApproved = /\bapproved\b/i.test(msg) || stage.title === "Format Editor";
+    if (isApproved && payload.repository?.full_name) {
+      const files = collectOutputFiles(c, stage);
+      for (const path of files) {
+        const card = await fetchAndSubmitDraft(payload.repository.full_name, path, ownerChatId);
+        if (card?.ok) notified.push(`card:${path}`);
+      }
+    }
   }
 
   return res.status(200).json({ ok: true, notified, merged });
+}
+
+function collectOutputFiles(commit, stage) {
+  const all = [...(commit.added || []), ...(commit.modified || [])];
+  if (stage.title === "Pillar Editor") {
+    return all.filter((p) => /^output\/pillar-.+\.md$/.test(p));
+  }
+  if (stage.title === "Format Editor") {
+    return all.filter((p) =>
+      /^output\/(carousel-.+\.json|reel-.+\.yaml|threads-.+\.yaml|stories-.+\.yaml)$/.test(p)
+    );
+  }
+  return [];
+}
+
+async function fetchAndSubmitDraft(repoFullName, path, ownerChatId) {
+  const token = process.env.GITHUB_TOKEN;
+  try {
+    const ghRes = await fetch(
+      `https://api.github.com/repos/${repoFullName}/contents/${encodeURIComponent(path)}?ref=main`,
+      {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/vnd.github.raw"
+        }
+      }
+    );
+    if (!ghRes.ok) {
+      return { ok: false, error: `GitHub ${ghRes.status}` };
+    }
+    const raw = await ghRes.text();
+
+    const { frontmatter, body, format } = parseDraft(raw, path);
+    const draftBody = body || raw.slice(0, 3500);
+
+    const id = await nextDraftId();
+    const draft = {
+      id,
+      body: draftBody,
+      rubric: frontmatter.rubric || pickRubric(format),
+      length: frontmatter.length || format,
+      status: "draft",
+      format,
+      source_path: path,
+      created_at: Date.now()
+    };
+    await saveDraft(id, draft);
+
+    await tg("sendMessage", {
+      chat_id: ownerChatId,
+      text: formatDraftCard(draft),
+      parse_mode: "HTML",
+      reply_markup: draftCardKeyboard(id),
+      disable_web_page_preview: true
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
+
+function parseDraft(raw, path) {
+  let format = "text";
+  if (path.endsWith(".json")) format = "carousel";
+  else if (path.includes("reel-")) format = "reels";
+  else if (path.includes("threads-")) format = "threads";
+  else if (path.includes("stories-")) format = "stories";
+  else if (path.includes("pillar-")) format = "pillar";
+
+  const fmMatch = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/m.exec(raw);
+  let frontmatter = {};
+  let body = raw;
+  if (fmMatch) {
+    body = fmMatch[2].trim();
+    for (const line of fmMatch[1].split("\n")) {
+      const m = /^([a-z_]+):\s*(.*)$/i.exec(line.trim());
+      if (m) frontmatter[m[1]] = m[2].replace(/^["']|["']$/g, "");
+    }
+  }
+
+  if (format === "carousel" || format === "reels" || format === "threads" || format === "stories") {
+    body = "<i>Открой файл в репо для полного контента:</i>\n<code>" + path + "</code>\n\n" + body.slice(0, 2500);
+  }
+
+  return { frontmatter, body, format };
+}
+
+function pickRubric(format) {
+  return ({
+    pillar: "💼",
+    carousel: "🖼",
+    reels: "🎬",
+    threads: "🧵",
+    stories: "📸"
+  })[format] || "📝";
 }
 
 async function mergeIntoMain(repoFullName, headBranch) {
