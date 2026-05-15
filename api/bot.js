@@ -226,6 +226,13 @@ async function handleMessage(message) {
     });
   }
 
+  // /swipe — add viral URL to swipe-file ingestion queue
+  // Usage: /swipe <URL>
+  // Or: forward a message containing a t.me/ig/tiktok/youtube/x URL
+  if (text.startsWith("/swipe") || message.forward_from_chat || message.forward_origin) {
+    return handleSwipe(chatId, message, text);
+  }
+
   if (text === "/status") {
     const owner = await kv.get(KEY_OWNER_CHAT);
     const qLen = await kv.zcard("queue:scheduled");
@@ -280,6 +287,80 @@ async function handleMessage(message) {
     text:
       `Не понял команду. Используй /help чтобы увидеть список.\n\n` +
       (text ? `Ты написал: «${text.slice(0, 200)}»` : "")
+  });
+}
+
+// ---------- Swipe ingestion (C2) ----------
+
+const SWIPE_URL_PATTERNS = [
+  /https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv)\/[^\s)]+/i,
+  /https?:\/\/(?:www\.)?tiktok\.com\/(?:@[^/]+\/video\/\d+|t\/[^\s)]+|v\/\d+)/i,
+  /https?:\/\/t\.me\/[^/]+\/\d+/i,
+  /https?:\/\/(?:www\.)?youtube\.com\/(?:shorts\/[\w-]+|watch\?v=[\w-]+)/i,
+  /https?:\/\/youtu\.be\/[\w-]+/i,
+  /https?:\/\/(?:twitter|x)\.com\/[^/]+\/status\/\d+/i
+];
+
+function extractSwipeUrl(message, text) {
+  // Try text body
+  for (const re of SWIPE_URL_PATTERNS) {
+    const m = (text || "").match(re);
+    if (m) return m[0];
+  }
+  // Try caption (forwarded media often have caption)
+  if (message.caption) {
+    for (const re of SWIPE_URL_PATTERNS) {
+      const m = message.caption.match(re);
+      if (m) return m[0];
+    }
+  }
+  // Try forward from TG channel — construct t.me URL
+  const fwd = message.forward_origin || {};
+  if (fwd.type === "channel" && fwd.chat?.username && fwd.message_id) {
+    return `https://t.me/${fwd.chat.username}/${fwd.message_id}`;
+  }
+  // Legacy forward_from_chat
+  if (message.forward_from_chat?.username && message.forward_from_message_id) {
+    return `https://t.me/${message.forward_from_chat.username}/${message.forward_from_message_id}`;
+  }
+  return null;
+}
+
+async function handleSwipe(chatId, message, text) {
+  const url = extractSwipeUrl(message, text);
+
+  if (!url) {
+    return tg("sendMessage", {
+      chat_id: chatId,
+      text:
+        `🤔 Не нашёл URL в сообщении.\n\n` +
+        `<b>Как использовать:</b>\n` +
+        `• <code>/swipe https://t.me/channel/123</code>\n` +
+        `• Форварднуть любой пост из TG/IG/TikTok/YT/X\n\n` +
+        `Поддержка: Instagram, TikTok, Telegram, YouTube, X (Twitter)`,
+      parse_mode: "HTML"
+    });
+  }
+
+  // Push to swipe:queue Redis list as JSON
+  const payload = JSON.stringify({
+    url,
+    added_at: Math.floor(Date.now() / 1000),
+    added_by: chatId,
+    source: message.forward_origin ? "forward" : "command"
+  });
+  await kv.rpush("swipe:queue", payload);
+  const queueLen = await kv.llen("swipe:queue");
+
+  return tg("sendMessage", {
+    chat_id: chatId,
+    text:
+      `✅ <b>Добавил в swipe-queue</b>\n\n` +
+      `<code>${url}</code>\n\n` +
+      `В очереди: ${queueLen}\n\n` +
+      `Для обработки: <code>python3 scripts/ingest-swipe.py --drain-redis</code>`,
+    parse_mode: "HTML",
+    disable_web_page_preview: true
   });
 }
 
