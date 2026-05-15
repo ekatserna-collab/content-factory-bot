@@ -246,6 +246,11 @@ async function handleMessage(message) {
     return handlePublishedList(chatId);
   }
 
+  // /iterate {post_id} — D-grade post → regenerate with different hook
+  if (text.startsWith("/iterate")) {
+    return handleIterate(chatId, text);
+  }
+
   if (text === "/status") {
     const owner = await kv.get(KEY_OWNER_CHAT);
     const qLen = await kv.zcard("queue:scheduled");
@@ -372,6 +377,75 @@ async function handleTrack(chatId, text) {
       `Platform: ${platform}\n\n` +
       `Метрики опросим через T+1, T+3, T+7 дней.\n` +
       `Финальный grade A-D через T+7.`,
+    parse_mode: "HTML",
+    disable_web_page_preview: true
+  });
+}
+
+async function handleIterate(chatId, text) {
+  const parts = text.split(/\s+/);
+  const postId = parts[1];
+
+  if (!postId || !/^\d+$/.test(postId)) {
+    return tg("sendMessage", {
+      chat_id: chatId,
+      text:
+        `🔄 <b>Iterate D-grade post</b>\n\n` +
+        `Usage: <code>/iterate POST_ID</code>\n\n` +
+        `Найди ID через /published.\n` +
+        `Iteration перегенерирует пост с другим hook'ом из bank.`,
+      parse_mode: "HTML"
+    });
+  }
+
+  const post = await kv.get(`published:${postId}`);
+  if (!post) {
+    return tg("sendMessage", {
+      chat_id: chatId,
+      text: `❌ Post #${postId} не найден в published.`
+    });
+  }
+
+  const grade = post.final_grade;
+  if (!grade) {
+    return tg("sendMessage", {
+      chat_id: chatId,
+      text:
+        `⏳ Post #${postId}: grade ещё не присвоен (нужно T+7 дней с tracked_at).\n` +
+        `Iteration рекомендуется только для D-grade.`,
+      parse_mode: "HTML"
+    });
+  }
+
+  if (grade !== "D" && grade !== "C") {
+    return tg("sendMessage", {
+      chat_id: chatId,
+      text:
+        `🤔 Post #${postId} имеет grade ${grade} — переделывать обычно не нужно.\n` +
+        `Iteration рекомендуется для C/D. Точно хочешь? Используй <code>/iterate ${postId} force</code>`,
+      parse_mode: "HTML"
+    });
+  }
+
+  // Mark for iteration — picked up by next Writer routine run
+  const iterateMarker = {
+    post_id: parseInt(postId),
+    requested_at: Math.floor(Date.now() / 1000),
+    original_grade: grade,
+    original_url: post.url,
+    status: "pending"
+  };
+  await kv.set(`iterate:${postId}`, iterateMarker);
+  await kv.lpush("iterate:queue", String(postId));
+
+  return tg("sendMessage", {
+    chat_id: chatId,
+    text:
+      `🔄 <b>Iteration #${postId} queued</b>\n\n` +
+      `Original grade: ${grade}\n` +
+      `URL: <code>${post.url}</code>\n\n` +
+      `Следующий запуск Writer'а перегенерирует с альтернативным hook'ом из bank.\n` +
+      `Очередь: <code>iterate:queue</code> в Redis.`,
     parse_mode: "HTML",
     disable_web_page_preview: true
   });
