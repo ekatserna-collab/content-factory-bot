@@ -233,6 +233,19 @@ async function handleMessage(message) {
     return handleSwipe(chatId, message, text);
   }
 
+  // /track URL — мы опубликовали пост, сохрани URL для метрик через T+1/T+3/T+7
+  // Usage: /track https://www.instagram.com/p/ABC/
+  //        /track https://t.me/aiplaceeee/123
+  //        /track https://x.com/handle/status/123
+  if (text.startsWith("/track")) {
+    return handleTrack(chatId, text);
+  }
+
+  // /published — show last 10 tracked posts
+  if (text === "/published") {
+    return handlePublishedList(chatId);
+  }
+
   if (text === "/status") {
     const owner = await kv.get(KEY_OWNER_CHAT);
     const qLen = await kv.zcard("queue:scheduled");
@@ -287,6 +300,105 @@ async function handleMessage(message) {
     text:
       `Не понял команду. Используй /help чтобы увидеть список.\n\n` +
       (text ? `Ты написал: «${text.slice(0, 200)}»` : "")
+  });
+}
+
+// ---------- Track published posts (C5) ----------
+
+const TRACK_PLATFORM_PATTERNS = [
+  { re: /(?:www\.)?instagram\.com\/p\//i, platform: "instagram_post" },
+  { re: /(?:www\.)?instagram\.com\/reel\//i, platform: "instagram_reel" },
+  { re: /(?:www\.)?instagram\.com\/tv\//i, platform: "instagram_tv" },
+  { re: /tiktok\.com/i, platform: "tiktok" },
+  { re: /t\.me\/[^/]+\/\d+/i, platform: "telegram_channel_post" },
+  { re: /(?:twitter|x)\.com\/[^/]+\/status/i, platform: "x_post" },
+  { re: /threads\.net/i, platform: "threads_meta" },
+  { re: /youtube\.com\/(?:shorts|watch)/i, platform: "youtube" },
+  { re: /youtu\.be/i, platform: "youtube" }
+];
+
+function detectTrackPlatform(url) {
+  for (const { re, platform } of TRACK_PLATFORM_PATTERNS) {
+    if (re.test(url)) return platform;
+  }
+  return "unknown";
+}
+
+async function handleTrack(chatId, text) {
+  const parts = text.split(/\s+/);
+  const url = parts[1];
+
+  if (!url || !/^https?:\/\//.test(url)) {
+    return tg("sendMessage", {
+      chat_id: chatId,
+      text:
+        `📤 <b>Track published post</b>\n\n` +
+        `Usage:\n` +
+        `<code>/track URL</code>\n\n` +
+        `Поддержка: Instagram / Telegram / X / Threads / TikTok / YouTube\n\n` +
+        `Метрики через T+1, T+3, T+7 дней.`,
+      parse_mode: "HTML"
+    });
+  }
+
+  const platform = detectTrackPlatform(url);
+  const trackedAt = Math.floor(Date.now() / 1000);
+
+  // Counter for post_id
+  const postId = await kv.incr("published:counter");
+
+  const payload = {
+    post_id: postId,
+    url,
+    platform,
+    tracked_at: trackedAt,
+    tracked_at_iso: new Date(trackedAt * 1000).toISOString(),
+    tracked_by: chatId,
+    metrics_history: [],
+    final_grade: null
+  };
+
+  // Save in Redis: published:{post_id} key + push to list
+  await kv.set(`published:${postId}`, payload);
+  await kv.lpush("published:list", String(postId));
+  // Trim list to last 100
+  await kv.ltrim("published:list", 0, 99);
+
+  return tg("sendMessage", {
+    chat_id: chatId,
+    text:
+      `✅ <b>Tracking #${postId}</b>\n\n` +
+      `URL: <code>${url}</code>\n` +
+      `Platform: ${platform}\n\n` +
+      `Метрики опросим через T+1, T+3, T+7 дней.\n` +
+      `Финальный grade A-D через T+7.`,
+    parse_mode: "HTML",
+    disable_web_page_preview: true
+  });
+}
+
+async function handlePublishedList(chatId) {
+  const ids = await kv.lrange("published:list", 0, 9);
+  if (!ids || ids.length === 0) {
+    return tg("sendMessage", {
+      chat_id: chatId,
+      text: "📤 Tracked: пусто. Используй <code>/track URL</code> после публикации.",
+      parse_mode: "HTML"
+    });
+  }
+  const lines = [];
+  for (const id of ids) {
+    const p = await kv.get(`published:${id}`);
+    if (!p) continue;
+    const when = new Date(p.tracked_at * 1000).toISOString().slice(0, 10);
+    const grade = p.final_grade ? ` · ${p.final_grade}` : "";
+    lines.push(`#${p.post_id} · ${when} · ${p.platform}${grade}\n  ${p.url.slice(0, 80)}`);
+  }
+  return tg("sendMessage", {
+    chat_id: chatId,
+    text: `📤 <b>Последние tracked posts:</b>\n\n${lines.join("\n\n")}`,
+    parse_mode: "HTML",
+    disable_web_page_preview: true
   });
 }
 
